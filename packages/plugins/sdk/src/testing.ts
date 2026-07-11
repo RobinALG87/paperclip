@@ -39,6 +39,7 @@ import type {
   PluginLocalFolderEntry,
   PluginLocalFolderStatus,
   PluginAccessMember,
+  SerializedIssueComment,
   PrincipalPermissionGrant,
   PermissionKey,
   PrincipalType,
@@ -256,7 +257,7 @@ export function assertEnvironmentEventOrder(
   }
 }
 
-/** Assert that a full lease lifecycle (acquire → release) occurred for an environment. */
+/** Assert that a full lease lifecycle (acquire â†’ release) occurred for an environment. */
 export function assertLeaseLifecycle(
   events: EnvironmentEventRecord[],
   environmentId: string,
@@ -384,7 +385,7 @@ export function createFakeEnvironmentDriver(options: FakeEnvironmentDriverOption
     async onResumeLease(params) {
       const existing = leases.get(params.providerLeaseId);
       if (!existing) {
-        throw new Error(`Lease ${params.providerLeaseId} not found — cannot resume`);
+        throw new Error(`Lease ${params.providerLeaseId} not found â€” cannot resume`);
       }
       return { providerLeaseId: existing.providerLeaseId, metadata: { ...existing.metadata, resumed: true } };
     },
@@ -497,6 +498,20 @@ export function createTestHarness(options: TestHarnessOptions): TestHarness {
   const goals = new Map<string, Goal>();
   const accessMembers = new Map<string, PluginAccessMember>();
   const principalGrants = new Map<string, PrincipalPermissionGrant[]>();
+
+  function serializeIssueComment(comment: IssueComment): SerializedIssueComment {
+    return {
+      ...comment,
+      deletedAt:
+        comment.deletedAt === undefined
+          ? undefined
+          : comment.deletedAt === null
+            ? null
+            : comment.deletedAt.toISOString(),
+      createdAt: comment.createdAt.toISOString(),
+      updatedAt: comment.updatedAt.toISOString(),
+    };
+  }
 
   function principalGrantsKey(companyId: string, principalType: PrincipalType, principalId: string) {
     return `${companyId}:${principalType}:${principalId}`;
@@ -1668,7 +1683,9 @@ export function createTestHarness(options: TestHarnessOptions): TestHarness {
         requireCapability(manifest, capabilitySet, "issue.comments.read");
         if (!isInCompany(issues.get(issueId), companyId)) return [];
         return (issueComments.get(issueId) ?? []).map((comment) =>
-          comment.deletedAt ? { ...comment, body: "", presentation: null, metadata: null } : comment
+          serializeIssueComment(
+            comment.deletedAt ? { ...comment, body: "", presentation: null, metadata: null } : comment,
+          )
         );
       },
       async createComment(issueId, body, companyId, options) {
@@ -1694,7 +1711,7 @@ export function createTestHarness(options: TestHarnessOptions): TestHarness {
         const current = issueComments.get(issueId) ?? [];
         current.push(comment);
         issueComments.set(issueId, current);
-        return comment;
+        return serializeIssueComment(comment);
       },
       async createInteraction(issueId, interaction, companyId, options) {
         requireCapability(manifest, capabilitySet, "issue.interactions.create");
@@ -2321,7 +2338,7 @@ export function createTestHarness(options: TestHarnessOptions): TestHarness {
           channelCompanyMap.set(channel, companyId);
         },
         emit(_channel: string, _event: unknown) {
-          // No-op in test harness — events are not forwarded
+          // No-op in test harness â€” events are not forwarded
         },
         close(channel: string) {
           channelCompanyMap.delete(channel);
@@ -2479,7 +2496,7 @@ export function createTestHarness(options: TestHarnessOptions): TestHarness {
  * environment driver simulation and lifecycle event recording.
  *
  * Use this to test environment plugins through the full host contract:
- * validateConfig → probe → acquireLease → realizeWorkspace → execute → releaseLease.
+ * validateConfig â†’ probe â†’ acquireLease â†’ realizeWorkspace â†’ execute â†’ releaseLease.
  */
 export function createEnvironmentTestHarness(options: EnvironmentTestHarnessOptions): EnvironmentTestHarness {
   const base = createTestHarness(options);

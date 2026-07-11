@@ -1,5 +1,5 @@
 /**
- * JSON-RPC 2.0 message types and protocol helpers for the host ↔ worker IPC
+ * JSON-RPC 2.0 message types and protocol helpers for the host â†” worker IPC
  * channel.
  *
  * The Paperclip plugin runtime uses JSON-RPC 2.0 over stdio to communicate
@@ -7,11 +7,11 @@
  *
  * - Core JSON-RPC 2.0 envelope types (request, response, notification, error)
  * - Standard and plugin-specific error codes
- * - Typed method maps for host→worker and worker→host calls
+ * - Typed method maps for hostâ†’worker and workerâ†’host calls
  * - Helper functions for creating well-formed messages
  *
- * @see PLUGIN_SPEC.md §12.1 — Process Model
- * @see PLUGIN_SPEC.md §13 — Host-Worker Protocol
+ * @see PLUGIN_SPEC.md Â§12.1 â€” Process Model
+ * @see PLUGIN_SPEC.md Â§13 â€” Host-Worker Protocol
  * @see https://www.jsonrpc.org/specification
  */
 
@@ -24,7 +24,6 @@ import type {
   Company,
   Project,
   Issue,
-  IssueComment,
   IssueDocument,
   IssueDocumentSummary,
   IssueAssigneeAdapterOverrides,
@@ -70,6 +69,7 @@ import type {
   PluginAuthorizationDecisionResult,
   PluginAuthorizationPolicyRecord,
   PluginAuthorizationPolicySummary,
+  SerializedIssueComment,
 } from "./types.js";
 import type {
   PluginHealthDiagnostics,
@@ -80,7 +80,7 @@ import type {
 } from "./define-plugin.js";
 
 // ---------------------------------------------------------------------------
-// JSON-RPC 2.0 — Core Protocol Types
+// JSON-RPC 2.0 â€” Core Protocol Types
 // ---------------------------------------------------------------------------
 
 /** The JSON-RPC protocol version. Always `"2.0"`. */
@@ -93,8 +93,8 @@ export const JSONRPC_VERSION = "2.0" as const;
 export type JsonRpcId = string | number;
 
 /**
- * Host-owned scope attached to a host→worker invocation. Workers may echo the
- * invocation id on nested worker→host calls, but they never author this scope.
+ * Host-owned scope attached to a hostâ†’worker invocation. Workers may echo the
+ * invocation id on nested workerâ†’host calls, but they never author this scope.
  */
 export interface JsonRpcInvocationScope {
   readonly companyId?: string | null;
@@ -125,10 +125,10 @@ export interface JsonRpcRequest<
   /**
    * Host-issued metadata for the top-level plugin invocation that is currently
    * executing. The worker treats this as opaque and echoes only the id on
-   * worker→host calls made from the same async execution context.
+   * workerâ†’host calls made from the same async execution context.
    */
   readonly paperclipInvocation?: PluginInvocationContext;
-  /** Opaque top-level invocation id echoed by worker→host requests. */
+  /** Opaque top-level invocation id echoed by workerâ†’host requests. */
   readonly paperclipInvocationId?: string;
 }
 
@@ -169,7 +169,7 @@ export interface JsonRpcErrorResponse<TData = unknown> {
 }
 
 /**
- * A JSON-RPC 2.0 response — either success or error.
+ * A JSON-RPC 2.0 response â€” either success or error.
  */
 export type JsonRpcResponse<TResult = unknown, TData = unknown> =
   | JsonRpcSuccessResponse<TResult>
@@ -178,7 +178,7 @@ export type JsonRpcResponse<TResult = unknown, TData = unknown> =
 /**
  * A JSON-RPC 2.0 notification (a request with no `id`).
  *
- * Notifications are fire-and-forget — no response is expected.
+ * Notifications are fire-and-forget â€” no response is expected.
  */
 export interface JsonRpcNotification<
   TMethod extends string = string,
@@ -191,11 +191,11 @@ export interface JsonRpcNotification<
   /** Structured parameters for the notification. */
   readonly params: TParams;
   /**
-   * Host-issued metadata for host→worker push notifications such as events.
-   * Worker→host notifications echo only `paperclipInvocationId`.
+   * Host-issued metadata for hostâ†’worker push notifications such as events.
+   * Workerâ†’host notifications echo only `paperclipInvocationId`.
    */
   readonly paperclipInvocation?: PluginInvocationContext;
-  /** Opaque top-level invocation id echoed by worker→host notifications. */
+  /** Opaque top-level invocation id echoed by workerâ†’host notifications. */
   readonly paperclipInvocationId?: string;
 }
 
@@ -238,7 +238,7 @@ export type JsonRpcErrorCode =
  * These live in the JSON-RPC "server error" reserved range (-32000 to -32099)
  * as specified by JSON-RPC 2.0 for implementation-defined server errors.
  *
- * @see PLUGIN_SPEC.md §19.7 — Error Propagation Through The Bridge
+ * @see PLUGIN_SPEC.md Â§19.7 â€” Error Propagation Through The Bridge
  */
 export const PLUGIN_RPC_ERROR_CODES = {
   /** The worker process is not running or not reachable. */
@@ -251,7 +251,7 @@ export const PLUGIN_RPC_ERROR_CODES = {
   TIMEOUT: -32003,
   /** The worker does not implement the requested optional method. */
   METHOD_NOT_IMPLEMENTED: -32004,
-  /** The worker→host call attempted to escape the current invocation company scope. */
+  /** The workerâ†’host call attempted to escape the current invocation company scope. */
   INVOCATION_SCOPE_DENIED: -32005,
   /** A catch-all for errors that do not fit other categories. */
   UNKNOWN: -32099,
@@ -274,7 +274,7 @@ export interface PluginInvocationScope {
 
 /**
  * Opaque invocation metadata generated by the host. Workers must not derive or
- * mutate this. They only echo the id on nested worker→host RPC calls.
+ * mutate this. They only echo the id on nested workerâ†’host RPC calls.
  */
 export interface PluginInvocationContext {
   id: string;
@@ -282,7 +282,7 @@ export interface PluginInvocationContext {
 }
 
 /**
- * Context provided to host-side worker→host handlers after the worker echoes a
+ * Context provided to host-side workerâ†’host handlers after the worker echoes a
  * host-issued invocation id.
  */
 export interface WorkerHostCallContext {
@@ -291,13 +291,13 @@ export interface WorkerHostCallContext {
 }
 
 // ---------------------------------------------------------------------------
-// Host → Worker Method Signatures (§13 Host-Worker Protocol)
+// Host â†’ Worker Method Signatures (Â§13 Host-Worker Protocol)
 // ---------------------------------------------------------------------------
 
 /**
  * Input for the `initialize` RPC method.
  *
- * @see PLUGIN_SPEC.md §13.1 — `initialize`
+ * @see PLUGIN_SPEC.md Â§13.1 â€” `initialize`
  */
 export interface InitializeParams {
   /** Full plugin manifest snapshot. */
@@ -330,7 +330,7 @@ export interface InitializeResult {
 /**
  * Input for the `configChanged` RPC method.
  *
- * @see PLUGIN_SPEC.md §13.4 — `configChanged`
+ * @see PLUGIN_SPEC.md Â§13.4 â€” `configChanged`
  */
 export interface ConfigChangedParams {
   /** The newly resolved configuration. */
@@ -340,7 +340,7 @@ export interface ConfigChangedParams {
 /**
  * Input for the `validateConfig` RPC method.
  *
- * @see PLUGIN_SPEC.md §13.3 — `validateConfig`
+ * @see PLUGIN_SPEC.md Â§13.3 â€” `validateConfig`
  */
 export interface ValidateConfigParams {
   /** The configuration to validate. */
@@ -350,7 +350,7 @@ export interface ValidateConfigParams {
 /**
  * Input for the `onEvent` RPC method.
  *
- * @see PLUGIN_SPEC.md §13.5 — `onEvent`
+ * @see PLUGIN_SPEC.md Â§13.5 â€” `onEvent`
  */
 export interface OnEventParams {
   /** The domain event to deliver. */
@@ -360,7 +360,7 @@ export interface OnEventParams {
 /**
  * Input for the `runJob` RPC method.
  *
- * @see PLUGIN_SPEC.md §13.6 — `runJob`
+ * @see PLUGIN_SPEC.md Â§13.6 â€” `runJob`
  */
 export interface RunJobParams {
   /** Job execution context. */
@@ -370,7 +370,7 @@ export interface RunJobParams {
 /**
  * Input for the `getData` RPC method.
  *
- * @see PLUGIN_SPEC.md §13.8 — `getData`
+ * @see PLUGIN_SPEC.md Â§13.8 â€” `getData`
  */
 export interface GetDataParams {
   /** Plugin-defined data key (e.g. `"sync-health"`). */
@@ -386,7 +386,7 @@ export interface GetDataParams {
 /**
  * Input for the `performAction` RPC method.
  *
- * @see PLUGIN_SPEC.md §13.9 — `performAction`
+ * @see PLUGIN_SPEC.md Â§13.9 â€” `performAction`
  */
 export type PluginPerformActionActorType = "user" | "agent" | "system";
 
@@ -426,7 +426,7 @@ export interface PerformActionParams {
 /**
  * Input for the `executeTool` RPC method.
  *
- * @see PLUGIN_SPEC.md §13.10 — `executeTool`
+ * @see PLUGIN_SPEC.md Â§13.10 â€” `executeTool`
  */
 export interface ExecuteToolParams {
   /** Tool name (without plugin namespace prefix). */
@@ -786,36 +786,36 @@ export interface PluginRenderCloseEvent {
 }
 
 /**
- * Map of host→worker RPC method names to their `[params, result]` types.
+ * Map of hostâ†’worker RPC method names to their `[params, result]` types.
  *
  * This type is the single source of truth for all methods the host can call
  * on a worker. Used by both the host dispatcher and the worker handler to
  * ensure type safety across the IPC boundary.
  */
 export interface HostToWorkerMethods {
-  /** @see PLUGIN_SPEC.md §13.1 */
+  /** @see PLUGIN_SPEC.md Â§13.1 */
   initialize: [params: InitializeParams, result: InitializeResult];
-  /** @see PLUGIN_SPEC.md §13.2 */
+  /** @see PLUGIN_SPEC.md Â§13.2 */
   health: [params: Record<string, never>, result: PluginHealthDiagnostics];
-  /** @see PLUGIN_SPEC.md §12.5 */
+  /** @see PLUGIN_SPEC.md Â§12.5 */
   shutdown: [params: Record<string, never>, result: void];
-  /** @see PLUGIN_SPEC.md §13.3 */
+  /** @see PLUGIN_SPEC.md Â§13.3 */
   validateConfig: [params: ValidateConfigParams, result: PluginConfigValidationResult];
-  /** @see PLUGIN_SPEC.md §13.4 */
+  /** @see PLUGIN_SPEC.md Â§13.4 */
   configChanged: [params: ConfigChangedParams, result: void];
-  /** @see PLUGIN_SPEC.md §13.5 */
+  /** @see PLUGIN_SPEC.md Â§13.5 */
   onEvent: [params: OnEventParams, result: void];
-  /** @see PLUGIN_SPEC.md §13.6 */
+  /** @see PLUGIN_SPEC.md Â§13.6 */
   runJob: [params: RunJobParams, result: void];
-  /** @see PLUGIN_SPEC.md §13.7 */
+  /** @see PLUGIN_SPEC.md Â§13.7 */
   handleWebhook: [params: PluginWebhookInput, result: void];
   /** Scoped plugin API route dispatch. */
   handleApiRequest: [params: PluginApiRequestInput, result: PluginApiResponse];
-  /** @see PLUGIN_SPEC.md §13.8 */
+  /** @see PLUGIN_SPEC.md Â§13.8 */
   getData: [params: GetDataParams, result: unknown];
-  /** @see PLUGIN_SPEC.md §13.9 */
+  /** @see PLUGIN_SPEC.md Â§13.9 */
   performAction: [params: PerformActionParams, result: unknown];
-  /** @see PLUGIN_SPEC.md §13.10 */
+  /** @see PLUGIN_SPEC.md Â§13.10 */
   executeTool: [params: ExecuteToolParams, result: ToolResult];
   detectExternalObjects: [
     params: DetectExternalObjectsParams,
@@ -883,7 +883,7 @@ export interface HostToWorkerMethods {
   ];
 }
 
-/** Union of all host→worker method names. */
+/** Union of all hostâ†’worker method names. */
 export type HostToWorkerMethodName = keyof HostToWorkerMethods;
 
 /** Required methods the worker MUST implement. */
@@ -923,11 +923,11 @@ export const HOST_TO_WORKER_OPTIONAL_METHODS: readonly HostToWorkerMethodName[] 
 ] as const;
 
 // ---------------------------------------------------------------------------
-// Worker → Host Method Signatures (SDK client calls)
+// Worker â†’ Host Method Signatures (SDK client calls)
 // ---------------------------------------------------------------------------
 
 /**
- * Map of worker→host RPC method names to their `[params, result]` types.
+ * Map of workerâ†’host RPC method names to their `[params, result]` types.
  *
  * These represent the SDK client calls that the worker makes back to the
  * host to access platform services (state, entities, config, etc.).
@@ -1373,11 +1373,11 @@ export interface WorkerToHostMethods {
   ];
   "issues.listComments": [
     params: { issueId: string; companyId: string },
-    result: IssueComment[],
+    result: SerializedIssueComment[],
   ];
   "issues.createComment": [
     params: { issueId: string; body: string; companyId: string; authorAgentId?: string },
-    result: IssueComment,
+    result: SerializedIssueComment,
   ];
   "issues.createInteraction": [
     params: {
@@ -1599,17 +1599,17 @@ export interface WorkerToHostMethods {
   ];
 }
 
-/** Union of all worker→host method names. */
+/** Union of all workerâ†’host method names. */
 export type WorkerToHostMethodName = keyof WorkerToHostMethods;
 
 // ---------------------------------------------------------------------------
-// Worker→Host Notification Types (fire-and-forget, no response)
+// Workerâ†’Host Notification Types (fire-and-forget, no response)
 // ---------------------------------------------------------------------------
 
 /**
- * Typed parameter shapes for worker→host JSON-RPC notifications.
+ * Typed parameter shapes for workerâ†’host JSON-RPC notifications.
  *
- * Notifications are fire-and-forget — the worker does not wait for a response.
+ * Notifications are fire-and-forget â€” the worker does not wait for a response.
  * These are used for streaming events and logging, not for request-response RPCs.
  */
 export interface WorkerToHostNotifications {
@@ -1656,7 +1656,7 @@ export interface WorkerToHostNotifications {
   };
 }
 
-/** Union of all worker→host notification method names. */
+/** Union of all workerâ†’host notification method names. */
 export type WorkerToHostNotificationName = keyof WorkerToHostNotifications;
 
 // ---------------------------------------------------------------------------
@@ -1664,25 +1664,25 @@ export type WorkerToHostNotificationName = keyof WorkerToHostNotifications;
 // ---------------------------------------------------------------------------
 
 /**
- * A typed JSON-RPC request for a specific host→worker method.
+ * A typed JSON-RPC request for a specific hostâ†’worker method.
  */
 export type HostToWorkerRequest<M extends HostToWorkerMethodName> =
   JsonRpcRequest<M, HostToWorkerMethods[M][0]>;
 
 /**
- * A typed JSON-RPC success response for a specific host→worker method.
+ * A typed JSON-RPC success response for a specific hostâ†’worker method.
  */
 export type HostToWorkerResponse<M extends HostToWorkerMethodName> =
   JsonRpcSuccessResponse<HostToWorkerMethods[M][1]>;
 
 /**
- * A typed JSON-RPC request for a specific worker→host method.
+ * A typed JSON-RPC request for a specific workerâ†’host method.
  */
 export type WorkerToHostRequest<M extends WorkerToHostMethodName> =
   JsonRpcRequest<M, WorkerToHostMethods[M][0]>;
 
 /**
- * A typed JSON-RPC success response for a specific worker→host method.
+ * A typed JSON-RPC success response for a specific workerâ†’host method.
  */
 export type WorkerToHostResponse<M extends WorkerToHostMethodName> =
   JsonRpcSuccessResponse<WorkerToHostMethods[M][1]>;
@@ -1905,7 +1905,7 @@ export function parseMessage(line: string): JsonRpcMessage {
     );
   }
 
-  // It's a valid JSON-RPC 2.0 envelope — return as-is and let the caller
+  // It's a valid JSON-RPC 2.0 envelope â€” return as-is and let the caller
   // use the type guards for more specific classification.
   return parsed as JsonRpcMessage;
 }

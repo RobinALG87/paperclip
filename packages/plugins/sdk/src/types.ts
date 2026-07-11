@@ -5,8 +5,8 @@
  * from `@paperclipai/plugin-sdk`.  The host provides a concrete implementation
  * of `PluginContext` to the plugin at initialisation time.
  *
- * @see PLUGIN_SPEC.md §14 — SDK Surface
- * @see PLUGIN_SPEC.md §29.2 — SDK Versioning
+ * @see PLUGIN_SPEC.md Â§14 â€” SDK Surface
+ * @see PLUGIN_SPEC.md Â§29.2 â€” SDK Versioning
  */
 
 import type {
@@ -18,7 +18,7 @@ import type {
   Company,
   Project,
   Issue,
-  IssueComment,
+  IssueComment as SharedIssueComment,
   IssueDocument,
   IssueDocumentSummary,
   IssueRelationIssueSummary,
@@ -118,7 +118,6 @@ export type {
   Company,
   Project,
   Issue,
-  IssueComment,
   IssueDocument,
   IssueDocumentSummary,
   IssueRelationIssueSummary,
@@ -140,8 +139,24 @@ export type {
   PrincipalType,
 } from "@paperclipai/shared";
 
+/**
+ * Issue comments returned over the worker JSON-RPC boundary.
+ *
+ * Dates in the host's database model are serialized by JSON.stringify before
+ * they reach a plugin worker, so plugin authors receive ISO 8601 strings rather
+ * than Date instances. Keep the public SDK type honest about that wire shape.
+ */
+export type SerializedIssueComment = Omit<SharedIssueComment, "createdAt" | "updatedAt" | "deletedAt"> & {
+  deletedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+/** @deprecated Use SerializedIssueComment for worker RPC responses. */
+export type IssueComment = SerializedIssueComment;
+
 // ---------------------------------------------------------------------------
-// Scope key — identifies where plugin state is stored
+// Scope key â€” identifies where plugin state is stored
 // ---------------------------------------------------------------------------
 
 /**
@@ -149,11 +164,11 @@ export type {
  * Scope is partitioned by `scopeKind` and optional `scopeId`.
  *
  * Examples:
- * - `{ scopeKind: "instance" }` — single global value for the whole instance
- * - `{ scopeKind: "project", scopeId: "proj-uuid" }` — per-project state
- * - `{ scopeKind: "issue", scopeId: "iss-uuid" }` — per-issue state
+ * - `{ scopeKind: "instance" }` â€” single global value for the whole instance
+ * - `{ scopeKind: "project", scopeId: "proj-uuid" }` â€” per-project state
+ * - `{ scopeKind: "issue", scopeId: "iss-uuid" }` â€” per-issue state
  *
- * @see PLUGIN_SPEC.md §21.3 `plugin_state`
+ * @see PLUGIN_SPEC.md Â§21.3 `plugin_state`
  */
 export interface ScopeKey {
   /** What kind of Paperclip object this state is scoped to. */
@@ -177,7 +192,7 @@ export interface ScopeKey {
  * All filter fields are optional. If omitted the plugin receives every event
  * of the subscribed type.
  *
- * @see PLUGIN_SPEC.md §16.1 — Event Filtering
+ * @see PLUGIN_SPEC.md Â§16.1 â€” Event Filtering
  */
 export interface EventFilter {
   /** Only receive events for this project. */
@@ -193,7 +208,7 @@ export interface EventFilter {
 /**
  * Envelope wrapping every domain event delivered to a plugin worker.
  *
- * @see PLUGIN_SPEC.md §16 — Event System
+ * @see PLUGIN_SPEC.md Â§16 â€” Event System
  */
 export interface PluginEvent<TPayload = unknown> {
   /** Unique event identifier (UUID). */
@@ -223,7 +238,7 @@ export interface PluginEvent<TPayload = unknown> {
 /**
  * Context passed to a plugin job handler when the host triggers a scheduled run.
  *
- * @see PLUGIN_SPEC.md §13.6 — `runJob`
+ * @see PLUGIN_SPEC.md Â§13.6 â€” `runJob`
  */
 export interface PluginJobContext {
   /** Stable job key matching the declaration in the manifest. */
@@ -243,7 +258,7 @@ export interface PluginJobContext {
 /**
  * Run context passed to a plugin tool handler when an agent invokes the tool.
  *
- * @see PLUGIN_SPEC.md §13.10 — `executeTool`
+ * @see PLUGIN_SPEC.md Â§13.10 â€” `executeTool`
  */
 export interface ToolRunContext {
   /** UUID of the agent invoking the tool. */
@@ -259,7 +274,7 @@ export interface ToolRunContext {
 /**
  * Result returned from a plugin tool handler.
  *
- * @see PLUGIN_SPEC.md §13.10 — `executeTool`
+ * @see PLUGIN_SPEC.md Â§13.10 â€” `executeTool`
  */
 export interface ToolResult {
   /** String content returned to the agent. Required for success responses. */
@@ -277,7 +292,7 @@ export interface ToolResult {
 /**
  * Input for creating or updating a plugin-owned entity.
  *
- * @see PLUGIN_SPEC.md §21.3 `plugin_entities`
+ * @see PLUGIN_SPEC.md Â§21.3 `plugin_entities`
  */
 export interface PluginEntityUpsert {
   /** Plugin-defined entity type (e.g. `"linear-issue"`, `"github-pr"`). */
@@ -299,7 +314,7 @@ export interface PluginEntityUpsert {
 /**
  * A plugin-owned entity record as returned by `ctx.entities.list()`.
  *
- * @see PLUGIN_SPEC.md §21.3 `plugin_entities`
+ * @see PLUGIN_SPEC.md Â§21.3 `plugin_entities`
  */
 export interface PluginEntityRecord {
   /** UUID primary key. */
@@ -350,8 +365,8 @@ export interface PluginEntityQuery {
  * Workspace metadata provided by the host. Plugins use this to resolve local
  * filesystem paths for file browsing, git, terminal, and process operations.
  *
- * @see PLUGIN_SPEC.md §7 — Project Workspaces
- * @see PLUGIN_SPEC.md §20 — Local Tooling
+ * @see PLUGIN_SPEC.md Â§7 â€” Project Workspaces
+ * @see PLUGIN_SPEC.md Â§20 â€” Local Tooling
  */
 export interface PluginWorkspace {
   /** UUID primary key. */
@@ -415,14 +430,14 @@ export interface PluginExecutionWorkspaceMetadata {
 // ---------------------------------------------------------------------------
 
 /**
- * `ctx.config` — read resolved operator configuration for this plugin.
+ * `ctx.config` â€” read resolved operator configuration for this plugin.
  *
  * Plugin workers receive the resolved config at initialisation. Use `get()`
  * to access the current configuration at any time. The host calls
  * `configChanged` on the worker when the operator updates config at runtime.
  *
- * @see PLUGIN_SPEC.md §13.3 — `validateConfig`
- * @see PLUGIN_SPEC.md §13.4 — `configChanged`
+ * @see PLUGIN_SPEC.md Â§13.3 â€” `validateConfig`
+ * @see PLUGIN_SPEC.md Â§13.4 â€” `configChanged`
  */
 export interface PluginConfigClient {
   /**
@@ -520,12 +535,12 @@ export interface PluginLocalFoldersClient {
 }
 
 /**
- * `ctx.events` — subscribe to and emit Paperclip domain events.
+ * `ctx.events` â€” subscribe to and emit Paperclip domain events.
  *
  * Requires `events.subscribe` capability for `on()`.
  * Requires `events.emit` capability for `emit()`.
  *
- * @see PLUGIN_SPEC.md §16 — Event System
+ * @see PLUGIN_SPEC.md Â§16 â€” Event System
  */
 export interface PluginEventsClient {
   /**
@@ -556,7 +571,7 @@ export interface PluginEventsClient {
    * `"acme.linear"` and the event name is `"sync-done"`, the full event type
    * becomes `"plugin.acme.linear.sync-done"`.
    *
-   * @see PLUGIN_SPEC.md §16.2 — Plugin-to-Plugin Events
+   * @see PLUGIN_SPEC.md Â§16.2 â€” Plugin-to-Plugin Events
    *
    * @param name - Bare event name (e.g. `"sync-done"`)
    * @param companyId - UUID of the company this event belongs to
@@ -566,11 +581,11 @@ export interface PluginEventsClient {
 }
 
 /**
- * `ctx.jobs` — register handlers for scheduled jobs declared in the manifest.
+ * `ctx.jobs` â€” register handlers for scheduled jobs declared in the manifest.
  *
  * Requires `jobs.schedule` capability.
  *
- * @see PLUGIN_SPEC.md §17 — Scheduled Jobs
+ * @see PLUGIN_SPEC.md Â§17 â€” Scheduled Jobs
  */
 export interface PluginJobsClient {
   /**
@@ -592,7 +607,7 @@ export interface PluginJobsClient {
 export type PluginLauncherRegistration = PluginLauncherDeclaration;
 
 /**
- * `ctx.launchers` — register launcher declarations at runtime.
+ * `ctx.launchers` â€” register launcher declarations at runtime.
  */
 export interface PluginLaunchersClient {
   /**
@@ -616,18 +631,18 @@ export interface PluginDatabaseClient {
 }
 
 /**
- * `ctx.http` — make outbound HTTP requests.
+ * `ctx.http` â€” make outbound HTTP requests.
  *
  * Requires `http.outbound` capability.
  *
- * @see PLUGIN_SPEC.md §15.1 — Capabilities: Runtime/Integration
+ * @see PLUGIN_SPEC.md Â§15.1 â€” Capabilities: Runtime/Integration
  */
 export interface PluginHttpClient {
   /**
    * Perform an outbound HTTP request.
    *
    * The host enforces `http.outbound` capability before allowing the call.
-   * Plugins may also use standard Node `fetch` or other libraries directly —
+   * Plugins may also use standard Node `fetch` or other libraries directly â€”
    * this client exists for host-managed tracing and audit logging.
    *
    * @param url - Target URL
@@ -638,7 +653,7 @@ export interface PluginHttpClient {
 }
 
 /**
- * `ctx.secrets` — resolve secret references.
+ * `ctx.secrets` â€” resolve secret references.
  *
  * Requires `secrets.read-ref` capability.
  *
@@ -646,7 +661,7 @@ export interface PluginHttpClient {
  * This client resolves the reference through the Paperclip secret provider
  * system and returns the resolved value at execution time.
  *
- * @see PLUGIN_SPEC.md §22 — Secrets
+ * @see PLUGIN_SPEC.md Â§22 â€” Secrets
  */
 export interface PluginSecretsClient {
   /**
@@ -667,7 +682,7 @@ export interface PluginSecretsClient {
 /**
  * Input for writing a plugin activity log entry.
  *
- * @see PLUGIN_SPEC.md §21.4 — Activity Log Changes
+ * @see PLUGIN_SPEC.md Â§21.4 â€” Activity Log Changes
  */
 export interface PluginActivityLogEntry {
   /** UUID of the company this activity belongs to. Required for auditing. */
@@ -683,11 +698,11 @@ export interface PluginActivityLogEntry {
 }
 
 /**
- * `ctx.activity` — write plugin-originated activity log entries.
+ * `ctx.activity` â€” write plugin-originated activity log entries.
  *
  * Requires `activity.log.write` capability.
  *
- * @see PLUGIN_SPEC.md §21.4 — Activity Log Changes
+ * @see PLUGIN_SPEC.md Â§21.4 â€” Activity Log Changes
  */
 export interface PluginActivityClient {
   /**
@@ -702,7 +717,7 @@ export interface PluginActivityClient {
 }
 
 /**
- * `ctx.state` — read and write plugin-scoped key-value state.
+ * `ctx.state` â€” read and write plugin-scoped key-value state.
  *
  * Each plugin gets an isolated namespace: state written by plugin A can never
  * be read or overwritten by plugin B. Within a plugin, state is partitioned by
@@ -752,7 +767,7 @@ export interface PluginActivityClient {
  * `plugin.state.read` capability required for `get()`.
  * `plugin.state.write` capability required for `set()` and `delete()`.
  *
- * @see PLUGIN_SPEC.md §21.3 `plugin_state`
+ * @see PLUGIN_SPEC.md Â§21.3 `plugin_state`
  */
 export interface PluginStateClient {
   /**
@@ -781,7 +796,7 @@ export interface PluginStateClient {
 
   /**
    * Delete a state value. No-ops silently if the entry does not exist
-   * (idempotent by design — safe to call without prior `get()`).
+   * (idempotent by design â€” safe to call without prior `get()`).
    *
    * @param input - Scope key identifying the entry to delete
    */
@@ -789,9 +804,9 @@ export interface PluginStateClient {
 }
 
 /**
- * `ctx.entities` — create and query plugin-owned entity records.
+ * `ctx.entities` â€” create and query plugin-owned entity records.
  *
- * @see PLUGIN_SPEC.md §21.3 `plugin_entities`
+ * @see PLUGIN_SPEC.md Â§21.3 `plugin_entities`
  */
 export interface PluginEntitiesClient {
   /**
@@ -812,12 +827,12 @@ export interface PluginEntitiesClient {
 }
 
 /**
- * `ctx.projects` — read project and workspace metadata.
+ * `ctx.projects` â€” read project and workspace metadata.
  *
  * Requires `projects.read` capability.
  * Requires `project.workspaces.read` capability for workspace operations.
  *
- * @see PLUGIN_SPEC.md §7 — Project Workspaces
+ * @see PLUGIN_SPEC.md Â§7 â€” Project Workspaces
  */
 export interface PluginProjectsClient {
   /**
@@ -864,7 +879,7 @@ export interface PluginProjectsClient {
    * @returns The primary workspace for the issue's project, or `null` if
    *   the issue has no project or the project has no workspace
    *
-   * @see PLUGIN_SPEC.md §20 — Local Tooling
+   * @see PLUGIN_SPEC.md Â§20 â€” Local Tooling
    */
   getWorkspaceForIssue(issueId: string, companyId: string): Promise<PluginWorkspace | null>;
 
@@ -877,7 +892,7 @@ export interface PluginProjectsClient {
 }
 
 /**
- * `ctx.executionWorkspaces` — read execution workspace metadata.
+ * `ctx.executionWorkspaces` â€” read execution workspace metadata.
  *
  * Requires `execution.workspaces.read`.
  */
@@ -890,7 +905,7 @@ export interface PluginExecutionWorkspacesClient {
 }
 
 /**
- * `ctx.routines` — resolve and reconcile plugin-managed Paperclip routines.
+ * `ctx.routines` â€” resolve and reconcile plugin-managed Paperclip routines.
  *
  * Requires `routines.managed` capability.
  */
@@ -921,7 +936,7 @@ export interface PluginRoutinesClient {
 }
 
 /**
- * `ctx.skills` — resolve and reconcile plugin-managed company skills.
+ * `ctx.skills` â€” resolve and reconcile plugin-managed company skills.
  *
  * Requires `skills.managed` capability.
  */
@@ -934,13 +949,13 @@ export interface PluginSkillsClient {
 }
 
 /**
- * `ctx.data` — register `getData` handlers that back `usePluginData()` in the
+ * `ctx.data` â€” register `getData` handlers that back `usePluginData()` in the
  * plugin's frontend components.
  *
  * The plugin's UI calls `usePluginData(key, params)` which routes through the
  * host bridge to the worker's registered handler.
  *
- * @see PLUGIN_SPEC.md §13.8 — `getData`
+ * @see PLUGIN_SPEC.md Â§13.8 â€” `getData`
  */
 export interface PluginDataClient {
   /**
@@ -953,10 +968,10 @@ export interface PluginDataClient {
 }
 
 /**
- * `ctx.actions` — register `performAction` handlers that back
+ * `ctx.actions` â€” register `performAction` handlers that back
  * `usePluginAction()` in the plugin's frontend components.
  *
- * @see PLUGIN_SPEC.md §13.9 — `performAction`
+ * @see PLUGIN_SPEC.md Â§13.9 â€” `performAction`
  */
 export interface PluginActionsClient {
   /**
@@ -972,13 +987,13 @@ export interface PluginActionsClient {
 }
 
 /**
- * `ctx.tools` — register handlers for agent tools declared in the manifest.
+ * `ctx.tools` â€” register handlers for agent tools declared in the manifest.
  *
  * Requires `agent.tools.register` capability.
  *
  * Tool names are automatically namespaced by plugin ID at runtime.
  *
- * @see PLUGIN_SPEC.md §11 — Agent Tools
+ * @see PLUGIN_SPEC.md Â§11 â€” Agent Tools
  */
 export interface PluginToolsClient {
   /**
@@ -996,12 +1011,12 @@ export interface PluginToolsClient {
 }
 
 /**
- * `ctx.logger` — structured logging from the plugin worker.
+ * `ctx.logger` â€” structured logging from the plugin worker.
  *
  * Log output is captured by the host, stored, and surfaced in the plugin
  * health dashboard.
  *
- * @see PLUGIN_SPEC.md §26.1 — Logging
+ * @see PLUGIN_SPEC.md Â§26.1 â€” Logging
  */
 export interface PluginLogger {
   /** Log an informational message. */
@@ -1019,11 +1034,11 @@ export interface PluginLogger {
 // ---------------------------------------------------------------------------
 
 /**
- * `ctx.metrics` — write plugin-contributed metrics.
+ * `ctx.metrics` â€” write plugin-contributed metrics.
  *
  * Requires `metrics.write` capability.
  *
- * @see PLUGIN_SPEC.md §15.1 — Capabilities: Data Write
+ * @see PLUGIN_SPEC.md Â§15.1 â€” Capabilities: Data Write
  */
 export interface PluginMetricsClient {
   /**
@@ -1037,7 +1052,7 @@ export interface PluginMetricsClient {
 }
 
 /**
- * `ctx.telemetry` — emit plugin-scoped telemetry to the host's external
+ * `ctx.telemetry` â€” emit plugin-scoped telemetry to the host's external
  * telemetry pipeline.
  *
  * Requires `telemetry.track` capability.
@@ -1059,7 +1074,7 @@ export interface PluginTelemetryClient {
 }
 
 /**
- * `ctx.companies` — read company metadata.
+ * `ctx.companies` â€” read company metadata.
  *
  * Requires `companies.read` capability.
  */
@@ -1076,13 +1091,13 @@ export interface PluginCompaniesClient {
 }
 
 /**
- * `ctx.issues.documents` — read and write issue documents.
+ * `ctx.issues.documents` â€” read and write issue documents.
  *
  * Requires:
  * - `issue.documents.read` for `list` and `get`
  * - `issue.documents.write` for `upsert` and `delete`
  *
- * @see PLUGIN_SPEC.md §14 — SDK Surface
+ * @see PLUGIN_SPEC.md Â§14 â€” SDK Surface
  */
 export interface PluginIssueDocumentsClient {
   /**
@@ -1315,7 +1330,7 @@ export interface PluginIssueSummariesClient {
 }
 
 /**
- * `ctx.issues` — read and mutate issues plus comments.
+ * `ctx.issues` â€” read and mutate issues plus comments.
  *
  * Requires:
  * - `issues.read` for read operations
@@ -1428,13 +1443,13 @@ export interface PluginIssuesClient {
       idempotencyKeyPrefix?: string | null;
     } & PluginIssueMutationActor,
   ): Promise<PluginIssueWakeupBatchResult[]>;
-  listComments(issueId: string, companyId: string): Promise<IssueComment[]>;
+  listComments(issueId: string, companyId: string): Promise<SerializedIssueComment[]>;
   createComment(
     issueId: string,
     body: string,
     companyId: string,
     options?: { authorAgentId?: string },
-  ): Promise<IssueComment>;
+  ): Promise<SerializedIssueComment>;
   createInteraction(
     issueId: string,
     interaction: CreateIssueThreadInteraction,
@@ -1474,7 +1489,7 @@ export interface PluginIssuesClient {
 }
 
 /**
- * `ctx.agents` — read and manage agents.
+ * `ctx.agents` â€” read and manage agents.
  *
  * Requires `agents.read` for reads; `agents.pause` / `agents.resume` /
  * `agents.invoke` for write operations.
@@ -1499,7 +1514,7 @@ export interface PluginAgentsClient {
 }
 
 // ---------------------------------------------------------------------------
-// Agent Sessions — two-way chat with agents
+// Agent Sessions â€” two-way chat with agents
 // ---------------------------------------------------------------------------
 
 /**
@@ -1537,7 +1552,7 @@ export interface AgentSessionSendResult {
 }
 
 /**
- * `ctx.agents.sessions` — create, message, and close agent chat sessions.
+ * `ctx.agents.sessions` â€” create, message, and close agent chat sessions.
  *
  * Requires `agent.sessions.create` for create, `agent.sessions.list` for list,
  * `agent.sessions.send` for sendMessage, `agent.sessions.close` for close.
@@ -1568,7 +1583,7 @@ export interface PluginAgentSessionsClient {
 }
 
 /**
- * `ctx.goals` — read and mutate goals.
+ * `ctx.goals` â€” read and mutate goals.
  *
  * Requires:
  * - `goals.read` for read operations
@@ -1767,11 +1782,11 @@ export interface PluginAuthorizationClient {
 }
 
 // ---------------------------------------------------------------------------
-// Streaming (worker → UI push channel)
+// Streaming (worker â†’ UI push channel)
 // ---------------------------------------------------------------------------
 
 /**
- * `ctx.streams` — push real-time events from the worker to the plugin UI.
+ * `ctx.streams` â€” push real-time events from the worker to the plugin UI.
  *
  * The worker opens a named channel, emits events on it, and closes it when
  * done. On the UI side, `usePluginStream(channel)` receives these events in
@@ -1794,7 +1809,7 @@ export interface PluginAuthorizationClient {
  */
 export interface PluginStreamsClient {
   /**
-   * Open a named stream channel. Optional — `emit()` implicitly opens if needed.
+   * Open a named stream channel. Optional â€” `emit()` implicitly opens if needed.
    * Sends a `stream:open` event to connected UI clients.
    */
   open(channel: string, companyId: string): void;
@@ -1843,7 +1858,7 @@ export interface PluginStreamsClient {
  * });
  * ```
  *
- * @see PLUGIN_SPEC.md §14 — SDK Surface
+ * @see PLUGIN_SPEC.md Â§14 â€” SDK Surface
  */
 export interface PluginContext {
   /** The plugin's manifest as validated at install time. */

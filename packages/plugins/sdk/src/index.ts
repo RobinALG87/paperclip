@@ -1,5 +1,5 @@
 /**
- * `@paperclipai/plugin-sdk` — Paperclip plugin worker-side SDK.
+ * `@paperclipai/plugin-sdk` â€” Paperclip plugin worker-side SDK.
  *
  * This is the main entrypoint for plugin worker code.  For plugin UI bundles,
  * import from `@paperclipai/plugin-sdk/ui` instead.
@@ -41,8 +41,8 @@
  * runWorker(plugin, import.meta.url);
  * ```
  *
- * @see PLUGIN_SPEC.md §14 — SDK Surface
- * @see PLUGIN_SPEC.md §29.2 — SDK Versioning
+ * @see PLUGIN_SPEC.md Â§14 â€” SDK Surface
+ * @see PLUGIN_SPEC.md Â§29.2 â€” SDK Versioning
  */
 
 // ---------------------------------------------------------------------------
@@ -295,6 +295,7 @@ export type {
   Project,
   Issue,
   IssueComment,
+  SerializedIssueComment,
   IssueDocumentSummary,
   Agent,
   Goal,
@@ -381,7 +382,7 @@ export type {
  *
  * Plugin authors do not need to add a separate `zod` dependency.
  *
- * @see PLUGIN_SPEC.md §14.1 — Example SDK Shape
+ * @see PLUGIN_SPEC.md Â§14.1 â€” Example SDK Shape
  *
  * @example
  * ```ts
